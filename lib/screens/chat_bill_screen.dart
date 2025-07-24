@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../providers/bill_provider.dart';
-import '../services/ai_assistant_service.dart';
 import '../models/bill.dart';
-import '../utils/app_config.dart';
 
 class ChatBillScreen extends StatefulWidget {
   const ChatBillScreen({super.key});
@@ -94,28 +93,6 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
         _isSending = false;
         _isReceiving = false;
         _currentAIResponse = '';
-      });
-    }
-  }
-
-  void _showBillsList(List<Bill> bills) {
-    // Add bills list to chat history
-    if (bills.isEmpty) {
-      context.read<BillProvider>().chatHistory.add({
-        'role': 'assistant',
-        'content': '目前没有账单记录。'
-      });
-    } else {
-      final sortedBills = List<Bill>.from(bills)
-        ..sort((a, b) => b.date.compareTo(a.date));
-      
-      final billListText = sortedBills.take(10).map((bill) => 
-        '${bill.date.month}-${bill.date.day} ${bill.title}: ¥${bill.amount.toStringAsFixed(2)}'
-      ).join('\n');
-      
-      context.read<BillProvider>().chatHistory.add({
-        'role': 'assistant',
-        'content': '最近的账单记录：\n$billListText'
       });
     }
   }
@@ -435,13 +412,62 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                   ),
                 ],
               ),
-              child: Text(
-                message + (_isReceiving && message == _currentAIResponse ? "▍" : ""),
-                style: TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontSize: 16.0,
-                  height: 1.4,
+              child: MarkdownBody(
+                data: message + (_isReceiving && message == _currentAIResponse ? "▍" : ""),
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 16.0,
+                    height: 1.4,
+                  ),
+                  h1: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 24.0,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  h2: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  h3: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 18.0,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  code: TextStyle(
+                    color: Color(0xFF2563EB),
+                    backgroundColor: Color(0xFFF1F5F9),
+                    fontSize: 14.0,
+                    fontFamily: 'monospace',
+                  ),
+                  codeblockPadding: EdgeInsets.all(12.0),
+                  codeblockDecoration: BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(color: Color(0xFFE2E8F0)),
+                  ),
+                  blockquote: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 16.0,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  listBullet: TextStyle(
+                    color: Color(0xFF2563EB),
+                  ),
+                  strong: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  em: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
+                selectable: true,
               ),
             ),
           ),

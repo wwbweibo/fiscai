@@ -49,6 +49,31 @@ class DatabaseService {
     return await db.insert('bills', bill.toMap());
   }
 
+  Future<List<Bill>> listBills(BillQuery query) async {
+    final db = await database;
+    var cond = '1=1';
+    var args = [];
+    if (query.isIncome != null) {
+      cond += ' AND isIncome = ?';
+      args.add(query.isIncome!);
+    }
+    if (query.dateBegin != null) {
+      cond += ' AND date >= ?';
+      args.add(query.dateBegin!.toString());
+    }
+    if (query.dateEnd != null) {
+      cond += ' AND date <= ?';
+      args.add(query.dateEnd!.toString());
+    }
+    if (query.category != null) {
+      cond += ' AND category = ?';
+      args.add(query.category!);
+    }
+    final List<Map<String, dynamic>> maps = await db.query('bills', where: cond, whereArgs: args);
+    return List.generate(maps.length, (i) {
+      return Bill.fromMap(maps[i]);
+    });
+  }
   // Get all bills
   Future<List<Bill>> getAllBills() async {
     final db = await database;

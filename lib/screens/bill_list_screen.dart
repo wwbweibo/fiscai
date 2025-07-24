@@ -17,7 +17,7 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
   String _searchQuery = '';
   String _selectedCategory = '全部';
   
-  final List<String> _categories = ['全部', '餐饮', '交通', '购物', '娱乐', '医疗', '教育', '住房', '其他'];
+  final List<String> _categories = ['全部', ...Bill.categories];
 
   @override
   void initState() {

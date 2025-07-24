@@ -72,7 +72,10 @@ dependencies:
   json_schema: ^5.2.1
 
   # For OpenAI API
-  dart_openai: ^5.1.0 
+  dart_openai: ^5.1.0
+  
+  # For markdown rendering
+  flutter_markdown: ^0.7.3 
 
 dev_dependencies:
   flutter_test:

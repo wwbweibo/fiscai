@@ -1,6 +1,5 @@
 import 'package:fiscai/models/bill.dart';
 import 'package:fiscai/services/database_service.dart';
-import 'package:json_schema/json_schema.dart';
 
 Future<int> createBillTool(Bill bill) async {
   final database = DatabaseService();
@@ -8,36 +7,6 @@ Future<int> createBillTool(Bill bill) async {
 }
 
 Map<String, dynamic> createBillToolModel() {
-  // 生成 LLMCreateBillModel 的 json schema
-  // final jsonSchema = JsonSchema.create({
-  //   "type": "object",
-  //   "properties": {
-  //     "bill": {
-  //       "type": "object",
-  //       "properties": {
-  //         "title": {"type": "string", "description": "账单标题"},
-  //         "amount": {"type": "number", "description": "账单金额"},
-  //         "type": {"type": "string", "description": "账单类型, 支出, 收入"},
-  //         "category": {"type": "string", "description": "账单分类"},
-  //         "date": {"type": "string", "description": "账单日期"},
-  //         "description": {"type": "string", "description": "账单描述"},
-  //         "paymentMethod": {"type": "string", "description": "支付方式"},
-  //         "isIncome": {"type": "boolean", "description": "是否是收入"},
-  //       },
-  //       "required": [
-  //         "title",
-  //         "amount",
-  //         "type",
-  //         "category",
-  //         "date",
-  //         "description",
-  //         "paymentMethod",
-  //         "isIncome",
-  //       ],
-  //     },
-  //   },
-  //   "required": ["bill"],
-  // });
   return {
     "type": "function",
     "function": {

@@ -19,6 +19,8 @@ class Bill {
     required this.isIncome,
   });
 
+  static const List<String> categories = ['餐饮', '交通', '购物', '娱乐', '医疗', '教育', '住房', '工资', '奖金', '投资', '理财', '其他'];
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -42,6 +44,25 @@ class Bill {
       description: map['description'],
       paymentMethod: map['paymentMethod'],
       isIncome: map['isIncome'] == 1,
+    );
+  }
+}
+
+class BillQuery {
+  DateTime? dateBegin;
+  DateTime? dateEnd;
+  String? category;
+  bool? isIncome;
+
+  BillQuery({this.dateBegin, this.dateEnd, this.category, this.isIncome});
+
+  factory BillQuery.fromMap(Map<String, dynamic> map) {
+    
+    return BillQuery(
+      dateBegin: map['dateBegin'] != null ? DateTime.parse(map['dateBegin']) : null,
+      dateEnd: map['dateEnd'] != null ? DateTime.parse(map['dateEnd']) : null,
+      category: map['category'] != null ? map['category'] : null,
+      isIncome: map['isIncome'] != null ? map['isIncome'] : null,
     );
   }
 }

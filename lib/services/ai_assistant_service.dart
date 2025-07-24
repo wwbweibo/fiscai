@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
-import 'package:dart_openai/dart_openai.dart';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import '../models/bill.dart';
-import '../utils/app_config.dart';
 import '../llmtools/record_bill.dart';
+import '../llmtools/list_bill.dart';
 
 class AIAssistantService {
   final String apiKey;
@@ -23,8 +21,14 @@ class AIAssistantService {
           'role': 'system',
           'content': ''' CURRENT_DATE: ${DateTime.now().toIso8601String()}
 你是FiscAI, 一个财务助手, 帮助用户管理他们的账单.
+
 你可以帮助用户:
-1. 记录账单, 使用create_bill工具来帮助用户记录账单。在记录账单时，请根据用户的输入推测账单的分类，日期如果没有明确指定，请使用当前日期，支付方式如果没有明确指定，请使用支付宝。
+1. 记录账单, 使用create_bill工具来帮助用户记录账单。在记录账单时，账单的分类请使用用户提供的分类，日期如果没有明确指定，请使用当前日期，支付方式如果没有明确指定，请使用支付宝。
+2. 列出并分析用户的账单，使用list_bills工具来帮助用户列出账单，并根据账单来分析用户的财务状况。提出切实可行的建议。
+
+用户的账单分类如下:
+
+${Bill.categories.join(', ')}
 
 作为财务助手, 你的语气可以保持轻松幽默。
 如果你需要更多信息, 请自然地询问.
@@ -34,7 +38,8 @@ class AIAssistantService {
       ];
 
       final createBillTool = createBillToolModel();
-      final tools = [createBillTool];
+      final listBillsTool = listBillsToolModel();
+      final tools = [createBillTool, listBillsTool];
       final response = await callLLM(messages, tools);
       await for (final line in response) {
         yield line;
@@ -361,6 +366,9 @@ Respond with only one of these exact values.
     if (toolCallName == 'create_bill') {
       return await callInsertBill(toolCallArgs);
     }
+    if (toolCallName == 'list_bills') {
+      return await callListBills(toolCallArgs);
+    }
     return {'error': 'Unknown tool: $toolCallName'};
   }
 
@@ -378,6 +386,19 @@ Respond with only one of these exact values.
     } catch (e) {
       log('Error in callInsertBill: $e');
       throw Exception('Failed to create bill: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> callListBills(String args) async {
+    try {
+      log('callListBills args: $args');
+      final parsedArgs = jsonDecode(args);
+      final query = BillQuery.fromMap(parsedArgs['query']);
+      final bills = await listBillsTool(query);
+      return bills.map((bill) => bill.toMap()).toList();
+    } catch (e) {
+      log('Error in callListBills: $e');
+      throw Exception('Failed to list bills: $e');
     }
   }
 }
