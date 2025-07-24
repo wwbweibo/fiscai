@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 主背景渐变 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 内部装饰渐变 -->
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#0EA5E9;stop-opacity:0.6" />
+    </linearGradient>
+    
+    <!-- 发光效果 -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 主背景圆角矩形 -->
+  <rect x="64" y="64" width="896" height="896" rx="196" ry="196" fill="url(#bgGradient)" />
+  
+  <!-- 外层装饰环 -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="url(#accentGradient)" stroke-width="8" opacity="0.3"/>
+  
+  <!-- 主体钱包/计算器图标 -->
+  <rect x="256" y="320" width="512" height="384" rx="32" ry="32" fill="white" opacity="0.95"/>
+  
+  <!-- 货币符号 ¥ -->
+  <g fill="#2563EB" filter="url(#glow)">
+    <!-- Y字母主体 -->
+    <path d="M 420 400 L 480 500 L 540 400 L 580 400 L 512 520 L 512 580 L 540 580 L 540 620 L 512 620 L 512 660 L 484 660 L 484 620 L 456 620 L 456 580 L 484 580 L 484 520 L 416 400 Z" />
+    <!-- 横线装饰 -->
+    <rect x="440" y="540" width="144" height="8" rx="4"/>
+    <rect x="440" y="560" width="144" height="8" rx="4"/>
+  </g>
+  
+  <!-- AI智能装饰线条 -->
+  <g stroke="url(#accentGradient)" stroke-width="6" fill="none" opacity="0.6">
+    <!-- 左侧几何线条 -->
+    <path d="M 180 400 L 220 440 L 180 480 L 140 440 Z"/>
+    <path d="M 160 560 L 200 600 L 160 640"/>
+    
+    <!-- 右侧几何线条 -->
+    <path d="M 844 400 L 804 440 L 844 480 L 884 440 Z"/>
+    <path d="M 864 560 L 824 600 L 864 640"/>
+    
+    <!-- 顶部装饰 -->
+    <path d="M 400 160 L 440 200 L 480 160 L 520 200 L 560 160 L 600 200 L 640 160"/>
+    
+    <!-- 底部装饰 -->
+    <path d="M 400 864 L 440 824 L 480 864 L 520 824 L 560 864 L 600 824 L 640 864"/>
+  </g>
+  
+  <!-- 科技感光点 -->
+  <circle cx="300" cy="300" r="8" fill="#06B6D4" opacity="0.8"/>
+  <circle cx="724" cy="300" r="6" fill="#0EA5E9" opacity="0.6"/>
+  <circle cx="300" cy="724" r="6" fill="#0EA5E9" opacity="0.6"/>
+  <circle cx="724" cy="724" r="8" fill="#06B6D4" opacity="0.8"/>
+</svg> 
