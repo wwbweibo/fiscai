@@ -66,7 +66,7 @@ class BillProvider with ChangeNotifier {
       notifyListeners();
 
       // Get streaming response from AI
-      yield* aiAssistant.sendMessageStream(message, _chatHistory);
+      yield* aiAssistant.sendMessageStream(_chatHistory);
     } catch (e) {
       print('Error sending message to AI assistant: $e');
       yield '抱歉，我遇到了一些问题，请稍后再试。';

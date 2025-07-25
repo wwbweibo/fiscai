@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/bill_provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'utils/app_config.dart';
 
 void main() async {
@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'FiscAI - 斐账',
       theme: lightSciFiTheme,
-      home: const HomeScreen(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

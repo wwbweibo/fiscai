@@ -14,7 +14,7 @@ class AIAssistantService {
   AIAssistantService({required this.apiKey, required this.baseUrl, required this.model});
 
   // Send message to AI and get streaming response
-  Stream<String> sendMessageStream(String message, List<Map<String, dynamic>> history) async* {
+  Stream<String> sendMessageStream(List<Map<String, dynamic>> history) async* {
     try {
       final messages = [
         {
@@ -31,6 +31,7 @@ class AIAssistantService {
 ${Bill.categories.join(', ')}
 
 作为财务助手, 你的语气可以保持轻松幽默。
+如果没有从用户的输入中识别到账单信息，请告诉用户没有识别到账单信息，你无法记录账单。
 如果你需要更多信息, 请自然地询问.
 '''
         },

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../providers/bill_provider.dart';
-import '../models/bill.dart';
+import '../widgets/image_source_bottom_sheet.dart';
+import '../services/ocr_service.dart';
 
 class ChatBillScreen extends StatefulWidget {
   const ChatBillScreen({super.key});
@@ -49,19 +52,19 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
 
     // Immediately add user message to history to prevent duplicates
     final provider = context.read<BillProvider>();
-    // provider.chatHistory.add({'role': 'user', 'content': message});
-    
-    // Force a rebuild to show the user message immediately
+    provider.chatHistory.add({'role': 'user', 'content': message});
+    await _sendMessageToLLM(provider.chatHistory);
+  }
+
+  Future<void> _sendMessageToLLM(List<Map<String, dynamic>> messages) async {
     setState(() {
       _isSending = true;
       _isReceiving = true;
       _currentAIResponse = '';
     });
-
-    // Send message to AI assistant
+    final provider = context.read<BillProvider>();
     final aiAssistant = provider.createAIAssistant();
-    provider.chatHistory.add({'role': 'user', 'content': message});
-    final stream = aiAssistant.sendMessageStream(message, provider.chatHistory);
+    final stream = aiAssistant.sendMessageStream(messages);
     
     // Listen to the stream and update the UI
     await for (final content in stream) {
@@ -94,6 +97,122 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
         _isReceiving = false;
         _currentAIResponse = '';
       });
+    }
+  }
+
+  void _showImageSourceBottomSheet() {
+    ImageSourceBottomSheet.show(
+      context,
+      onCameraPressed: () async {
+        try {
+          final ImagePicker picker = ImagePicker();
+          final XFile? image = await picker.pickImage(source: ImageSource.camera);
+          if (image != null) {
+            _handleSelectedImage(image);
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('拍照失败: $e'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      },
+      onGalleryPressed: () async {
+        try {
+          final ImagePicker picker = ImagePicker();
+          final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+          if (image != null) {
+            _handleSelectedImage(image);
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('选择图片失败: $e'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  Future<void> _handleSelectedImage(XFile imageFile) async {
+    // 显示图片分析消息
+    final provider = context.read<BillProvider>();
+    final imageMessage = "我上传了一张账单图片，请帮我分析这张图片中的账单信息并记录到账单中。";
+    
+    // 添加用户消息
+    provider.chatHistory.add({
+      'role': 'user', 
+      'content': imageMessage,
+      'image_path': imageFile.path,
+    });
+    
+    await _sendImageToAI(imageFile.path);
+    // 立即刷新UI显示图片消息
+    setState(() {});
+  }
+
+  Future<void> _sendImageToAI(String imagePath) async {
+    final provider = context.read<BillProvider>();
+    
+    setState(() {
+      _isSending = true;
+      _isReceiving = true;
+      _currentAIResponse = '';
+    });
+
+    try {
+      setState(() {
+        _isSending = true;
+        _isReceiving = true;
+        _currentAIResponse = '正在识别图片...';
+      });
+
+      // 先做OCR
+      final ocrText = await OCRService.ocrImage(imagePath);
+      // 如果ocrText为空或者识别失败，则告诉用户没有从图片中识别到账单信息
+      if (ocrText.isEmpty || ocrText == 'OCRing image failed') {
+        _isReceiving = false;
+        _isSending = false;
+        _currentAIResponse = '';
+        provider.addAIResponseToHistory('我没有从图片中识别到账单信息，你可以尝试手动输入账单信息或者给我一张清晰的账单图片。');
+        return;
+      }
+      
+      // 做 deepcopy，不然ocr的message会污染provider的chatHistory
+      final messages = provider.chatHistory.map((e) => Map<String, dynamic>.from(e)).toList();
+      messages.add({
+        'role': 'user',
+        'content': '这里是图片识别结果：' + ocrText + '，请帮我分析这张图片中的账单信息。',
+      });
+      await _sendMessageToLLM(messages);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('图片处理失败: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _isReceiving = false;
+          _currentAIResponse = '';
+        });
+      }
     }
   }
 
@@ -134,7 +253,7 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16.0),
                       child: isUser 
-                        ? _buildUserMessageBubble(message['content'])
+                        ? _buildUserMessageBubble(message)
                         : _buildAIResponseBubble(message['content']),
                     );
                   },
@@ -177,19 +296,10 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                         padding: const EdgeInsets.only(left: 4.0),
                         child: Row(
                           children: [
-                                                         _buildInputActionButton(
+                              _buildInputActionButton(
                                icon: Icons.camera_alt_outlined,
                                onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('拍照功能开发中...'),
-                                    backgroundColor: Color(0xFF2563EB),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                );
+                                _showImageSourceBottomSheet();
                               },
                             ),
                             const SizedBox(width: 4),
@@ -301,7 +411,10 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   }
 
   // Build user message bubble
-  Widget _buildUserMessageBubble(String message) {
+  Widget _buildUserMessageBubble(Map<String, dynamic> messageData) {
+    final String message = messageData['content'] ?? '';
+    final String? imagePath = messageData['image_path'];
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -346,14 +459,63 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                   ),
                 ],
               ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.w500,
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 显示图片（如果有的话）
+                  if (imagePath != null) ...[
+                    Container(
+                      width: 200,
+                      height: 200,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.file(
+                          File(imagePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.white.withOpacity(0.2),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    if (message.isNotEmpty) ...[
+                      const Divider(
+                        color: Colors.white24,
+                        height: 1,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
+                  
+                  // 显示文字消息
+                  if (message.isNotEmpty)
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w500,
+                        height: 1.4,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
