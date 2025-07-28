@@ -116,4 +116,9 @@ class DatabaseService {
       whereArgs: [id],
     );
   }
+
+  Future<void> clearBills() async {
+    final db = await database;
+    await db.delete('bills', where: '1=1');
+  }
 }

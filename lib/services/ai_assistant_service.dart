@@ -21,10 +21,11 @@ class AIAssistantService {
           'role': 'system',
           'content': ''' CURRENT_DATE: ${DateTime.now().toIso8601String()}
 你是FiscAI, 一个财务助手, 帮助用户管理他们的账单.
+当信息足够时，你可以直接使用提供给你的工具来帮助用户管理他们的账单。
 
 你可以帮助用户:
-1. 记录账单, 使用create_bill工具来帮助用户记录账单。在记录账单时，账单的分类请使用用户提供的分类，日期如果没有明确指定，请使用当前日期，支付方式如果没有明确指定，请使用支付宝。
-2. 列出并分析用户的账单，使用list_bills工具来帮助用户列出账单，并根据账单来分析用户的财务状况。提出切实可行的建议。
+1. 记录账单, 帮助用户记录账单。在记录账单时，账单的分类请使用用户提供的分类，日期如果没有明确指定，请使用当前日期，支付方式如果没有明确指定，请使用支付宝。
+2. 列出并分析用户的账单，帮助用户列出账单，并根据账单来分析用户的财务状况。提出切实可行的建议。
 
 用户的账单分类如下:
 
@@ -41,7 +42,7 @@ ${Bill.categories.join(', ')}
       final createBillTool = createBillToolModel();
       final listBillsTool = listBillsToolModel();
       final tools = [createBillTool, listBillsTool];
-      final response = await callLLM(messages, tools);
+      final response = callLLM(messages, tools);
       await for (final line in response) {
         yield line;
       }
@@ -234,7 +235,7 @@ Respond with only one of these exact values.
 
   Stream<String> callLLM(List<Map<String, dynamic>> messages, List<Map<String, dynamic>> tools) async* {
     while (true) {
-      final request = http.Request('POST', Uri.parse('$baseUrl/v1/chat/completions'));
+      final request = http.Request('POST', Uri.parse('$baseUrl/chat/completions'));
       request.headers.addAll({
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $apiKey',
@@ -245,7 +246,9 @@ Respond with only one of these exact values.
         'stream': true,
         'temperature': 0.7,
         'tools': tools,
+        'tool_choice': 'auto',
       });
+      log('request url: ${request.url}; method: ${request.method}; body: ${request.body}, headers: ${request.headers}');
 
       var response = await streamRequest(request);
       var allContent = "";
@@ -261,7 +264,7 @@ Respond with only one of these exact values.
           
           if (line.startsWith('data: ')) {
             final data = line.substring(6).trim();
-            
+            log(data);
             if (data == '[DONE]') {
               log('Stream completed');
               break;
@@ -345,7 +348,6 @@ Respond with only one of these exact values.
                 }
 
                 if (content != null && content is String && content.isNotEmpty) {
-                  log('Received content: $content');
                   allContent += content;
                   yield content;
                 }

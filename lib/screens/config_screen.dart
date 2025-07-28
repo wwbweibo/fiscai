@@ -13,6 +13,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
 
+  final _supportedModels = [
+    {
+      'name': 'DeepSeek',
+      'baseUrl': 'https://api.deepseek.com/v1',
+      'model': 'deepseek-chat',
+    },
+    {
+      'name': 'DeepSeek Reasoner',
+      'baseUrl': 'https://api.deepseek.com/v1',
+      'model': 'deepseek-reasoner',
+    },
+    {
+      'name': 'Kimi',
+      'baseUrl': 'https://api.moonshot.com/v1',
+      'model': 'kimi-latest',
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +71,28 @@ class _ConfigScreenState extends State<ConfigScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // 下拉选择
+          Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(width: 60, child: 
+                const Text('模型:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                DropdownButton(
+                value: AppConfig.model,
+                items: [
+                  for (var model in _supportedModels)
+                    DropdownMenuItem(value: model['model'], child: Text(model['name'] ?? '')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _modelController.text = value!;
+                      _baseUrlController.text = _supportedModels.firstWhere((model) => model['model'] == _modelController.text)['baseUrl']!;
+                    });
+                  },
+                ),
+              ],
+            ),
             TextField(
               controller: _apiKeyController,
               decoration: const InputDecoration(
@@ -63,6 +103,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _baseUrlController,
+              enabled: false,
               decoration: const InputDecoration(
                 labelText: 'Base URL',
                 border: OutlineInputBorder(),
@@ -71,6 +112,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _modelController,
+              enabled: false,
               decoration: const InputDecoration(
                 labelText: 'Model',
                 border: OutlineInputBorder(),

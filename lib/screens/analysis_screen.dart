@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/bill_provider.dart';
-import '../models/bill.dart';
 
 class AnalysisScreen extends StatelessWidget {
   const AnalysisScreen({super.key});

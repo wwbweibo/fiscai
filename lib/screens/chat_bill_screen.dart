@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:io';
 import '../providers/bill_provider.dart';
 import '../widgets/image_source_bottom_sheet.dart';
@@ -21,12 +22,21 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   bool _isSending = false;
   String _currentAIResponse = '';
   bool _isReceiving = false;
+  
+  // 语音识别相关变量
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  String _lastWords = '';
 
   @override
   void initState() {
     super.initState();
+    // 初始化语音识别
+    _initSpeech();
+    
     // Initialize with a welcome message
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<BillProvider>();
       if (provider.chatHistory.isEmpty) {
         provider.chatHistory.add({
@@ -34,6 +44,7 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
           'content': '你好！我是你的财务助手FiscAI。你可以告诉我你的账单信息，比如"昨天在星巴克花了35元买咖啡"，我会帮你记录下来。你也可以问我查看账单或分析财务情况。'
         });
       }
+      setState(() {});
     });
   }
 
@@ -41,7 +52,158 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+    _speechToText.cancel();
     super.dispose();
+  }
+
+  // 初始化语音识别
+  Future<void> _initSpeech() async {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (error) {
+          print('语音识别错误: $error');
+          setState(() {
+            _isListening = false;
+          });
+          
+          // 显示错误提示
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('语音识别出错: ${error.errorMsg}'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+        onStatus: (status) {
+          print('语音识别状态: $status');
+          // 只在真正完成时才更新状态
+          if (status == 'done') {
+            _onSpeechComplete();
+          } else if (status == 'notListening') {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        },
+        debugLogging: true,
+      );
+      
+      print('语音识别初始化: ${_speechEnabled ? "成功" : "失败"}');
+      setState(() {});
+    } catch (e) {
+      print('语音识别初始化失败: $e');
+      _speechEnabled = false;
+      setState(() {});
+    }
+  }
+
+  // 语音识别完成处理
+  void _onSpeechComplete() {
+    setState(() {
+      _isListening = false;
+    });
+    
+    // 如果有识别结果，自动填入输入框并发送
+    if (_lastWords.isNotEmpty) {
+      _textController.text = _lastWords;
+      // 延迟一下再发送，让用户看到识别结果
+      Future.delayed(Duration(milliseconds: 500), () {
+        _sendMessage();
+      });
+    }
+  }
+
+  // 开始或停止语音识别
+  Future<void> _toggleListening() async {
+    if (!_speechEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('语音识别不可用，请检查设备支持和权限'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (_isListening) {
+      await _stopListening();
+    } else {
+      await _startListening();
+    }
+  }
+
+  // 开始语音识别
+  Future<void> _startListening() async {
+    try {
+      setState(() {
+        _isListening = true;
+        _lastWords = '';
+      });
+
+      await _speechToText.listen(
+        onResult: (result) {
+          print('语音识别结果: ${result.recognizedWords}, 是否最终: ${result.finalResult}');
+          setState(() {
+            _lastWords = result.recognizedWords;
+          });
+          
+          // 如果是最终结果，自动完成
+          if (result.finalResult && result.recognizedWords.isNotEmpty) {
+            _onSpeechComplete();
+          }
+        },
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+        localeId: 'zh_CN',
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    } catch (e) {
+      print('开始语音识别失败: $e');
+      setState(() {
+        _isListening = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('启动语音识别失败'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // 停止语音识别
+  Future<void> _stopListening() async {
+    try {
+      await _speechToText.stop();
+      setState(() {
+        _isListening = false;
+      });
+      
+      // 如果有识别结果，处理结果
+      if (_lastWords.isNotEmpty) {
+        _textController.text = _lastWords;
+        // 手动停止时立即发送
+        await _sendMessage();
+      }
+    } catch (e) {
+      print('停止语音识别失败: $e');
+      setState(() {
+        _isListening = false;
+      });
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -190,10 +352,10 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
       
       // 做 deepcopy，不然ocr的message会污染provider的chatHistory
       final messages = provider.chatHistory.map((e) => Map<String, dynamic>.from(e)).toList();
-      messages.add({
-        'role': 'user',
-        'content': '这里是图片识别结果：' + ocrText + '，请帮我分析这张图片中的账单信息。',
-      });
+              messages.add({
+          'role': 'user',
+          'content': '这里是图片识别结果：$ocrText，请帮我分析这张图片中的账单信息。',
+        });
       await _sendMessageToLLM(messages);
     } catch (e) {
       if (mounted) {
@@ -214,6 +376,145 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
         });
       }
     }
+  }
+
+  // 检查是否可以重置（有多于一条消息或有用户消息）
+  bool _canReset(BillProvider provider) {
+    if (provider.chatHistory.isEmpty) return false;
+    if (provider.chatHistory.length == 1) {
+      // 只有一条消息，检查是否是欢迎消息
+      final message = provider.chatHistory.first;
+      return message['role'] != 'assistant' || 
+             !message['content'].toString().contains('你好！我是你的财务助手FiscAI');
+    }
+    return true; // 有多条消息时可以重置
+  }
+
+  // 重置会话
+  void _resetChat() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.refresh,
+                color: Color(0xFF2563EB),
+                size: 24,
+              ),
+              SizedBox(width: 8),
+              Text(
+                '重置会话',
+                style: TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            '确定要清空所有聊天记录吗？\n这个操作无法撤销。',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 16,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                '取消',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performReset();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                '确定重置',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 执行重置操作
+  void _performReset() {
+    final provider = context.read<BillProvider>();
+    
+    // 清空聊天记录
+    provider.chatHistory.clear();
+    
+    // 添加新的欢迎消息
+    provider.chatHistory.add({
+      'role': 'assistant',
+      'content': '你好！我是你的财务助手FiscAI。你可以告诉我你的账单信息，比如"昨天在星巴克花了35元买咖啡"，我会帮你记录下来。你也可以问我查看账单或分析财务情况。'
+    });
+    
+    // 清空输入框
+    _textController.clear();
+    
+    // 重置语音相关状态
+    if (_isListening) {
+      _speechToText.cancel();
+    }
+    setState(() {
+      _isListening = false;
+      _lastWords = '';
+      _isSending = false;
+      _isReceiving = false;
+      _currentAIResponse = '';
+    });
+    
+    // 显示成功提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('会话已重置'),
+          ],
+        ),
+        backgroundColor: Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
   }
 
   @override
@@ -296,27 +597,21 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                         padding: const EdgeInsets.only(left: 4.0),
                         child: Row(
                           children: [
-                              _buildInputActionButton(
-                               icon: Icons.camera_alt_outlined,
-                               onTap: () {
+                            _buildInputActionButton(
+                              icon: Icons.refresh_outlined,
+                              onTap: _canReset(billProvider) ? () => _resetChat() : () {},
+                            ),
+                            const SizedBox(width: 4),
+                            _buildInputActionButton(
+                              icon: Icons.camera_alt_outlined,
+                              onTap: () {
                                 _showImageSourceBottomSheet();
                               },
                             ),
                             const SizedBox(width: 4),
-                                                         _buildInputActionButton(
-                               icon: Icons.mic_outlined,
-                               onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('语音功能开发中...'),
-                                    backgroundColor: Color(0xFF2563EB),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                );
-                              },
+                            _buildInputActionButton(
+                              icon: _isListening ? Icons.mic : Icons.mic_outlined,
+                              onTap: _speechEnabled ? () => _toggleListening() : () {},
                             ),
                           ],
                         ),
@@ -324,28 +619,68 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                       
                       // 输入框
                       Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          minLines: 1,
-                          maxLines: 4,
-                          style: TextStyle(
-                            color: Color(0xFF1E293B),
-                            fontSize: 16,
-                            height: 1.4,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: '输入消息...',
-                            hintStyle: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 16,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 语音识别结果显示
+                            if (_isListening && _lastWords.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                margin: EdgeInsets.only(bottom: 8.0),
+                                decoration: BoxDecoration(
+                                  color: Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Color(0xFFF59E0B),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.mic,
+                                      color: Color(0xFFF59E0B),
+                                      size: 16,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _lastWords,
+                                        style: TextStyle(
+                                          color: Color(0xFF92400E),
+                                          fontSize: 14,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            TextField(
+                              controller: _textController,
+                              minLines: 1,
+                              maxLines: 4,
+                              style: TextStyle(
+                                color: Color(0xFF1E293B),
+                                fontSize: 16,
+                                height: 1.4,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: _isListening ? '正在录音...' : '输入消息...',
+                                hintStyle: TextStyle(
+                                  color: _isListening ? Color(0xFFEF4444) : Color(0xFF94A3B8),
+                                  fontSize: 16,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 12.0,
+                                ),
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 12.0,
-                            ),
-                          ),
-                          onSubmitted: (_) => _sendMessage(),
+                          ],
                         ),
                       ),
                       
@@ -639,18 +974,47 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   }
 
   Widget _buildInputActionButton({required IconData icon, required VoidCallback onTap}) {
+    final bool isRecording = icon == Icons.mic;
+    final bool isMicButton = icon == Icons.mic || icon == Icons.mic_outlined;
+    final bool isResetButton = icon == Icons.refresh_outlined;
+    
+    // 获取provider来检查重置按钮状态
+    final provider = context.read<BillProvider>();
+    
+    final bool isEnabled = isMicButton 
+      ? _speechEnabled 
+      : isResetButton 
+        ? _canReset(provider)
+        : true;
+    
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTap: isEnabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
         width: 36,
         height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.transparent,
+          color: isRecording 
+            ? Color(0xFFEF4444).withOpacity(0.1) 
+            : isResetButton 
+              ? Color(0xFF6366F1).withOpacity(0.1)
+              : Colors.transparent,
+          border: isRecording 
+            ? Border.all(color: Color(0xFFEF4444), width: 2)
+            : isResetButton
+              ? Border.all(color: Color(0xFF6366F1).withOpacity(0.2), width: 1)
+              : null,
         ),
         child: Icon(
           icon,
-          color: Color(0xFF64748B),
+          color: isRecording 
+            ? Color(0xFFEF4444) 
+            : isResetButton
+              ? Color(0xFF6366F1)
+              : isEnabled 
+                ? Color(0xFF64748B) 
+                : Color(0xFFBDC3C7), // 禁用状态的灰色
           size: 22,
         ),
       ),

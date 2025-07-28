@@ -33,6 +33,14 @@ class BillProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearBills() async {
+    try {
+      await DatabaseService().clearBills();
+    } catch (e) {
+      log("clear bill erro: $e");
+    }
+  }
+
   // Add a new bill
   Future<void> addBill(Bill bill) async {
     try {

@@ -111,6 +111,14 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
               );
             },
           ),
+          // 清空账单
+          IconButton(
+            icon: Icon(Icons.delete, color: Color.fromARGB(255, 250, 74, 74),),
+            onPressed: () => {
+              context.read<BillProvider>().clearBills(),
+              context.read<BillProvider>().loadBills()
+            },
+          ),
         ],
       ),
       body: Consumer<BillProvider>(
