@@ -26,7 +26,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     },
     {
       'name': 'Kimi',
-      'baseUrl': 'https://api.moonshot.com/v1',
+      'baseUrl': 'https://api.moonshot.cn/v1',
       'model': 'kimi-latest',
     },
   ];

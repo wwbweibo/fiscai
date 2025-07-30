@@ -28,6 +28,9 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   bool _speechEnabled = false;
   bool _isListening = false;
   String _lastWords = '';
+  
+  // 操作按钮展开状态
+  bool _isActionButtonsExpanded = false;
 
   @override
   void initState() {
@@ -105,6 +108,7 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
   void _onSpeechComplete() {
     setState(() {
       _isListening = false;
+      _isActionButtonsExpanded = false; // 语音识别完成后收起按钮组
     });
     
     // 如果有识别结果，自动填入输入框并发送
@@ -491,6 +495,7 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
       _isSending = false;
       _isReceiving = false;
       _currentAIResponse = '';
+      _isActionButtonsExpanded = false; // 重置时收起按钮组
     });
     
     // 显示成功提示
@@ -513,6 +518,108 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+    );
+  }
+
+  // 构建主操作按钮
+  Widget _buildMainActionButton() {
+    IconData icon;
+    VoidCallback onTap;
+    
+    if (_isActionButtonsExpanded) {
+      // 展开状态：显示关闭图标
+      icon = Icons.close;
+      onTap = () {
+        setState(() {
+          _isActionButtonsExpanded = false;
+        });
+      };
+    } else if (_isListening) {
+      // 正在录音：显示麦克风图标，点击停止录音
+      icon = Icons.mic;
+      onTap = () => _toggleListening();
+    } else {
+      // 默认状态：显示加号图标，点击展开菜单
+      icon = Icons.add_circle_outline;
+      onTap = () {
+        setState(() {
+          _isActionButtonsExpanded = true;
+        });
+      };
+    }
+    
+    return _buildInputActionButton(
+      icon: icon,
+      onTap: onTap,
+    );
+  }
+
+  // 构建可展开的操作按钮组
+  Widget _buildExpandableActionButtons(BillProvider billProvider) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 主操作按钮（智能显示当前最相关的功能）
+          _buildMainActionButton(),
+          
+          // 展开的按钮组
+          AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
+            width: _isActionButtonsExpanded ? 128 : 0, // 8 + 36 + 4 + 36 + 4 + 36 + 4 = 128
+            child: ClipRect(
+              child: AnimatedOpacity(
+                duration: Duration(milliseconds: 250),
+                opacity: _isActionButtonsExpanded ? 1.0 : 0.0,
+                child: _isActionButtonsExpanded
+                  ? Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        _buildInputActionButton(
+                          icon: Icons.refresh_outlined,
+                          onTap: _canReset(billProvider) ? () {
+                            _resetChat();
+                            // 执行操作后收起按钮组
+                            setState(() {
+                              _isActionButtonsExpanded = false;
+                            });
+                          } : () {},
+                        ),
+                        const SizedBox(width: 4),
+                        _buildInputActionButton(
+                          icon: Icons.camera_alt_outlined,
+                          onTap: () {
+                            _showImageSourceBottomSheet();
+                            // 执行操作后收起按钮组
+                            setState(() {
+                              _isActionButtonsExpanded = false;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        _buildInputActionButton(
+                          icon: _isListening ? Icons.mic : Icons.mic_outlined,
+                          onTap: _speechEnabled ? () {
+                            _toggleListening();
+                            // 如果不是正在录音，执行操作后收起按钮组
+                            if (!_isListening) {
+                              setState(() {
+                                _isActionButtonsExpanded = false;
+                              });
+                            }
+                          } : () {},
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    )
+                  : Container(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -592,30 +699,8 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                   ),
                   child: Row(
                     children: [
-                      // 左侧功能按钮组
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4.0),
-                        child: Row(
-                          children: [
-                            _buildInputActionButton(
-                              icon: Icons.refresh_outlined,
-                              onTap: _canReset(billProvider) ? () => _resetChat() : () {},
-                            ),
-                            const SizedBox(width: 4),
-                            _buildInputActionButton(
-                              icon: Icons.camera_alt_outlined,
-                              onTap: () {
-                                _showImageSourceBottomSheet();
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            _buildInputActionButton(
-                              icon: _isListening ? Icons.mic : Icons.mic_outlined,
-                              onTap: _speechEnabled ? () => _toggleListening() : () {},
-                            ),
-                          ],
-                        ),
-                      ),
+                      // 左侧可展开功能按钮组
+                      _buildExpandableActionButtons(billProvider),
                       
                       // 输入框
                       Expanded(
@@ -678,6 +763,14 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
                                   vertical: 12.0,
                                 ),
                               ),
+                              onTap: () {
+                                // 点击输入框时收起按钮组
+                                if (_isActionButtonsExpanded) {
+                                  setState(() {
+                                    _isActionButtonsExpanded = false;
+                                  });
+                                }
+                              },
                               onSubmitted: (_) => _sendMessage(),
                             ),
                           ],
