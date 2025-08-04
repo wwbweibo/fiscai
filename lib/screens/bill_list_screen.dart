@@ -55,6 +55,8 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
   Map<String, List<Bill>> _groupBillsByDate(List<Bill> bills) {
     final Map<String, List<Bill>> groupedBills = {};
     
+    bills.sort((a, b) => b.date.compareTo(a.date));
+
     for (final bill in bills) {
       final dateKey = _formatDateKey(bill.date);
       if (!groupedBills.containsKey(dateKey)) {
