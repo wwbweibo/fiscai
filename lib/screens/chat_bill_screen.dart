@@ -229,9 +229,15 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
     ScreenshotService.setOnNotificationAction((String action, String? screenshotPath) {
       log('收到通知操作: $action, 截图路径: $screenshotPath');
       
-      if ((action == 'recognize_bill' || action == 'open_app') && screenshotPath != null && screenshotPath.isNotEmpty) {
-        // 从通知进入，自动处理截图
-        _handleScreenshotFromNotification(screenshotPath);
+      if (action == 'recognize_bill' || action == 'open_app') {
+        // 检查平台
+        if (Theme.of(context).platform == TargetPlatform.iOS) {
+          // iOS平台：无法直接获取截图，引导用户手动选择
+          _handleiOSScreenshotFromNotification();
+        } else if (screenshotPath != null && screenshotPath.isNotEmpty) {
+          // Android平台：自动处理截图
+          _handleScreenshotFromNotification(screenshotPath);
+        }
       }
     });
   }
@@ -315,6 +321,67 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
     } catch (e) {
       log('处理截图失败: $e');
       _showErrorMessage('处理截图失败: $e');
+    }
+  }
+  
+  // 处理iOS截图通知（无法直接获取截图文件）
+  Future<void> _handleiOSScreenshotFromNotification() async {
+    log('处理iOS截图通知');
+    
+    try {
+      // 显示提示消息
+      final provider = context.read<BillProvider>();
+      final imageMessage = "检测到您刚才截取了屏幕截图！请点击下方的拍照按钮选择刚才的截图进行账单识别。";
+      
+      // 添加系统消息
+      provider.chatHistory.add({
+        'role': 'assistant',
+        'content': imageMessage,
+      });
+      
+      // 立即刷新UI
+      setState(() {});
+      
+      // 延迟后自动展开操作按钮，引导用户选择图片
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      if (mounted) {
+        setState(() {
+          _isActionButtonsExpanded = true;
+        });
+        
+        // 显示选择图片的提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.camera_alt, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('请点击拍照按钮选择刚才的截图'),
+                ),
+              ],
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+            action: SnackBarAction(
+              label: '选择图片',
+              textColor: Colors.white,
+              onPressed: () {
+                _showImageSourceBottomSheet();
+                setState(() {
+                  _isActionButtonsExpanded = false;
+                });
+              },
+            ),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      log('处理iOS截图通知失败: $e');
+      _showErrorMessage('处理截图提醒失败: $e');
     }
   }
   

@@ -45,6 +45,15 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
+		<!-- Background Modes -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>background-processing</string>
+			<string>background-fetch</string>
+		</array>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>需要访问麦克风以进行语音记账</string>
+		
 		<!-- Permissions -->
 		<key>NSCameraUsageDescription</key>
 		<string>需要访问相机以拍摄账单照片</string>
@@ -52,6 +61,12 @@
 		<string>需要访问麦克风以进行语音记账</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>需要访问相册以选择账单照片</string>
+		<key>NSUserNotificationUsageDescription</key>
+		<string>需要发送通知以提醒您处理截图账单</string>
+		
+		<!-- Screenshot monitoring support -->
+		<key>UIApplicationExitsOnSuspend</key>
+		<false/>
 		<key>UIStatusBarHidden</key>
 		<false/>
 	</dict>
