@@ -3,11 +3,17 @@ import 'package:provider/provider.dart';
 import 'providers/bill_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_config.dart';
+import 'services/screenshot_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.loadConfig();
-  
+  // 请求通知权限
+  await ScreenshotService.requestNotificationPermission();
+  // 初始化截图服务
+  await ScreenshotService.initialize();
+  // 启动后台截图监听服务（推荐使用后台服务）
+  await ScreenshotService.startBackgroundService();
   runApp(
     ChangeNotifierProvider(
       create: (context) => BillProvider(),

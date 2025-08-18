@@ -13,6 +13,7 @@ import 'dart:io';
 import '../providers/bill_provider.dart';
 import '../widgets/image_source_bottom_sheet.dart';
 import '../services/ocr_service.dart';
+import '../services/screenshot_service.dart';
 
 class ChatBillScreen extends StatefulWidget {
   const ChatBillScreen({super.key});
@@ -43,6 +44,9 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
     // 初始化语音识别
     _initSpeech();
     
+    // 设置截图通知回调
+    _setupScreenshotNotificationCallback();
+    
     // Initialize with a welcome message
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<BillProvider>();
@@ -61,6 +65,8 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
     _textController.dispose();
     _scrollController.dispose();
     _speechToText.cancel();
+    // 清除截图服务回调
+    ScreenshotService.clearCallbacks();
     super.dispose();
   }
 
@@ -214,6 +220,115 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
       setState(() {
         _isListening = false;
       });
+    }
+  }
+
+  // 设置截图通知回调
+  void _setupScreenshotNotificationCallback() {
+    log('设置截图通知回调');
+    ScreenshotService.setOnNotificationAction((String action, String? screenshotPath) {
+      log('收到通知操作: $action, 截图路径: $screenshotPath');
+      
+      if ((action == 'recognize_bill' || action == 'open_app') && screenshotPath != null && screenshotPath.isNotEmpty) {
+        // 从通知进入，自动处理截图
+        _handleScreenshotFromNotification(screenshotPath);
+      }
+    });
+  }
+  
+  // 处理从通知传来的截图
+  Future<void> _handleScreenshotFromNotification(String screenshotPath) async {
+    log('开始处理截图: $screenshotPath');
+    
+    try {
+      String? finalImagePath;
+      
+      // 判断是URI还是文件路径
+      if (screenshotPath.startsWith('content://')) {
+        log('检测到URI格式，尝试转换: $screenshotPath');
+        
+        // 首先检查URI是否可访问
+        final isAccessible = await ScreenshotService.isUriAccessible(screenshotPath);
+        log('URI可访问性: $isAccessible');
+        
+        if (isAccessible) {
+          // 尝试将URI转换为临时文件
+          finalImagePath = await ScreenshotService.processUriToImage(screenshotPath);
+          if (finalImagePath != null) {
+            log('URI转换成功: $finalImagePath');
+          } else {
+            log('URI转换失败');
+            _showErrorMessage('无法访问截图文件，请稍后重试或手动添加图片');
+            return;
+          }
+        } else {
+          log('URI不可访问');
+          _showErrorMessage('截图文件暂时无法访问，请稍后重试或手动添加图片');
+          return;
+        }
+      } else {
+        log('检测到文件路径格式');
+        // 检查文件是否存在
+        final file = File(screenshotPath);
+        log('检查文件存在性: ${file.path}');
+        
+        if (!await file.exists()) {
+          log('文件不存在: ${file.path}');
+          _showErrorMessage('截图文件不存在: ${file.path}');
+          return;
+        }
+        
+        // 检查文件大小
+        final fileSize = await file.length();
+        log('文件大小: $fileSize bytes');
+        
+        if (fileSize == 0) {
+          log('文件大小为0');
+          _showErrorMessage('截图文件为空');
+          return;
+        }
+        
+        finalImagePath = screenshotPath;
+      }
+      
+      // 显示处理截图的消息
+      final provider = context.read<BillProvider>();
+      final imageMessage = "这是截取的图片，请帮我识别账单信息并记录到账单中";
+      
+      // 添加系统消息
+      provider.chatHistory.add({
+        'role': 'user',
+        'content': imageMessage,
+        'image_path': finalImagePath,
+      });
+      
+      // 立即刷新UI
+      setState(() {});
+      
+      // 延迟一下让用户看到消息，然后开始处理
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      log('开始AI识别图片: $finalImagePath');
+      // 自动处理截图
+      await _sendImageToAI(finalImagePath);
+      
+    } catch (e) {
+      log('处理截图失败: $e');
+      _showErrorMessage('处理截图失败: $e');
+    }
+  }
+  
+  // 显示错误消息
+  void _showErrorMessage(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
