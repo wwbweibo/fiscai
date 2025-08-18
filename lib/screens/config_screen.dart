@@ -8,27 +8,24 @@ class ConfigScreen extends StatefulWidget {
   State<ConfigScreen> createState() => _ConfigScreenState();
 }
 
+class ModelConfig {
+  final String name;
+  final String baseUrl;
+  final String model;
+  final bool vision;
+
+  ModelConfig({required this.name, required this.baseUrl, required this.model, required this.vision});
+}
+
 class _ConfigScreenState extends State<ConfigScreen> {
   final _apiKeyController = TextEditingController();
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
 
   final _supportedModels = [
-    {
-      'name': 'DeepSeek',
-      'baseUrl': 'https://api.deepseek.com/v1',
-      'model': 'deepseek-chat',
-    },
-    {
-      'name': 'DeepSeek Reasoner',
-      'baseUrl': 'https://api.deepseek.com/v1',
-      'model': 'deepseek-reasoner',
-    },
-    {
-      'name': 'Kimi',
-      'baseUrl': 'https://api.moonshot.cn/v1',
-      'model': 'kimi-latest',
-    },
+    ModelConfig(name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', vision: false),
+    ModelConfig(name: 'DeepSeek Reasoner', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-reasoner', vision: false),
+    ModelConfig(name: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-latest', vision: true),
   ];
 
   @override
@@ -52,6 +49,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _apiKeyController.text,
       _baseUrlController.text,
       _modelController.text,
+      _supportedModels.firstWhere((model) => model.model == _modelController.text).vision,
     );
     
     if (mounted) {
@@ -82,12 +80,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
                 value: AppConfig.model,
                 items: [
                   for (var model in _supportedModels)
-                    DropdownMenuItem(value: model['model'], child: Text(model['name'] ?? '')),
+                    DropdownMenuItem(value: model.model, child: Text(model.name)),
                   ],
                   onChanged: (value) {
                     setState(() {
                       _modelController.text = value!;
-                      _baseUrlController.text = _supportedModels.firstWhere((model) => model['model'] == _modelController.text)['baseUrl']!;
+                      _baseUrlController.text = _supportedModels.firstWhere((model) => model.model == _modelController.text).baseUrl;
                     });
                   },
                 ),

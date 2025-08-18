@@ -1,3 +1,8 @@
+import 'dart:convert';
+
+import 'dart:developer';
+
+import 'package:fiscai/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -165,9 +170,11 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
         listenFor: const Duration(seconds: 30),
         pauseFor: const Duration(seconds: 3),
         localeId: 'zh_CN',
-        partialResults: true,
-        cancelOnError: true,
-        listenMode: stt.ListenMode.confirmation,
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: true,
+          listenMode: stt.ListenMode.confirmation,
+        ),
       );
     } catch (e) {
       print('开始语音识别失败: $e');
@@ -337,30 +344,57 @@ class _ChatBillScreenState extends State<ChatBillScreen> {
     });
 
     try {
-      setState(() {
-        _isSending = true;
-        _isReceiving = true;
-        _currentAIResponse = '正在识别图片...';
-      });
-
-      // 先做OCR
-      final ocrText = await OCRService.ocrImage(imagePath);
-      // 如果ocrText为空或者识别失败，则告诉用户没有从图片中识别到账单信息
-      if (ocrText.isEmpty || ocrText == 'OCRing image failed') {
-        _isReceiving = false;
-        _isSending = false;
-        _currentAIResponse = '';
-        provider.addAIResponseToHistory('我没有从图片中识别到账单信息，你可以尝试手动输入账单信息或者给我一张清晰的账单图片。');
-        return;
-      }
-      
-      // 做 deepcopy，不然ocr的message会污染provider的chatHistory
-      final messages = provider.chatHistory.map((e) => Map<String, dynamic>.from(e)).toList();
-              messages.add({
-          'role': 'user',
-          'content': '这里是图片识别结果：$ocrText，请帮我分析这张图片中的账单信息。',
+      log('AppConfig.vision: ${AppConfig.vision}');
+      if (!AppConfig.vision) {
+        setState(() {
+          _isSending = true;
+          _isReceiving = true;
+          _currentAIResponse = '正在识别图片...';
         });
-      await _sendMessageToLLM(messages);
+
+        // 先做OCR
+        final ocrText = await OCRService.ocrImage(imagePath);
+        // 如果ocrText为空或者识别失败，则告诉用户没有从图片中识别到账单信息
+        if (ocrText.isEmpty || ocrText == 'OCRing image failed') {
+          _isReceiving = false;
+          _isSending = false;
+          _currentAIResponse = '';
+          provider.addAIResponseToHistory('我没有从图片中识别到账单信息，你可以尝试手动输入账单信息或者给我一张清晰的账单图片。');
+          return;
+        }
+        
+        // 做 deepcopy，不然ocr的message会污染provider的chatHistory
+        final messages = provider.chatHistory.map((e) => Map<String, dynamic>.from(e)).toList();
+                messages.add({
+            'role': 'user',
+            'content': '这里是图片识别结果：$ocrText，请帮我分析这张图片中的账单信息。',
+          });
+        await _sendMessageToLLM(messages);
+      }
+      else {
+        log('imagePath: $imagePath');
+        final image_base64 = base64Encode(File(imagePath).readAsBytesSync());
+        final image_type = imagePath.split('.').last;
+        final messages = provider.chatHistory.map((e) => Map<String, dynamic>.from(e)).toList();
+        // 移除最后一条消息
+        messages.removeLast();
+        messages.add({
+          'role': 'user',
+          'content': [
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/$image_type;base64,$image_base64",
+              }
+            },
+            {
+              "type": "text",
+              "text": "我上传了一张账单图片，请帮我分析这张图片中的账单信息并记录到账单中。"
+            }
+          ],
+        });
+        await _sendMessageToLLM(messages);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
