@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../providers/bill_provider.dart';
+import '../models/bill.dart';
 
 class AnalysisScreen extends StatelessWidget {
   const AnalysisScreen({super.key});
+
+  // 计算最近7天的每日账单金额
+  Map<DateTime, double> _getLast7DaysAmounts(List<Bill> bills) {
+    final now = DateTime.now();
+    final sevenDaysAgo = now.subtract(const Duration(days: 6)); // 包括今天共7天
+    
+    // 初始化7天的金额为0
+    final dailyAmounts = <DateTime, double>{};
+    for (int i = 0; i < 7; i++) {
+      final date = sevenDaysAgo.add(Duration(days: i));
+      // 只保留日期部分，忽略时间
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      dailyAmounts[dateOnly] = 0.0;
+    }
+    
+    // 填充实际账单金额
+    for (var bill in bills) {
+      final billDate = DateTime(bill.date.year, bill.date.month, bill.date.day);
+      if (dailyAmounts.containsKey(billDate)) {
+        dailyAmounts[billDate] = dailyAmounts[billDate]! + bill.amount;
+      }
+    }
+    
+    return dailyAmounts;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +101,9 @@ class AnalysisScreen extends StatelessWidget {
         }
 
         final netBalance = totalIncome - totalExpense;
+        
+        // 计算最近7天的账单金额
+        final dailyAmounts = _getLast7DaysAmounts(bills);
 
         return Container(
           decoration: BoxDecoration(
@@ -181,6 +211,11 @@ class AnalysisScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                
+                const SizedBox(height: 32),
+                
+                // 近7天账单趋势图表
+                _buildTrendChart(dailyAmounts),
                 
                 const SizedBox(height: 32),
                 
@@ -440,6 +475,221 @@ class AnalysisScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 创建近7天账单金额趋势图表
+  Widget _buildTrendChart(Map<DateTime, double> dailyAmounts) {
+    // 检查是否有数据
+    final hasData = dailyAmounts.values.any((amount) => amount > 0);
+    
+    if (!hasData) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 图表标题
+            Row(
+              children: [
+                Icon(
+                  Icons.timeline,
+                  color: Colors.blue[700],
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  '近7天账单趋势',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                '暂无最近7天的账单数据',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // 按日期排序
+    final sortedDates = dailyAmounts.keys.toList()..sort();
+    
+    // 准备图表数据
+    final spots = sortedDates.asMap().entries.map((entry) {
+      final index = entry.key;
+      final date = entry.value;
+      final amount = dailyAmounts[date]!;
+      
+      return FlSpot(index.toDouble(), amount);
+    }).toList();
+    
+    // 格式化日期显示
+    final dateLabels = sortedDates.map((date) {
+      final day = date.day;
+      final month = date.month;
+      return '$month/$day';
+    }).toList();
+    
+    // 获取最大金额用于Y轴刻度
+    final maxAmount = dailyAmounts.values.reduce((a, b) => a > b ? a : b);
+    final yAxisMax = maxAmount * 1.2; // 留出一些空间
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 图表标题
+          Row(
+            children: [
+              Icon(
+                Icons.timeline,
+                color: Colors.blue[700],
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '近7天账单趋势',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // 图表
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < dateLabels.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              dateLabels[index],
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('0');
+                        return Text(
+                          '¥${value.toInt()}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(color: Colors.grey.shade300, width: 1),
+                ),
+                minX: 0,
+                maxX: (dateLabels.length - 1).toDouble(),
+                minY: 0,
+                maxY: yAxisMax,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: Colors.blue,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.blue.withOpacity(0.3),
+                          Colors.blue.withOpacity(0.1),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // 图表说明
+          const SizedBox(height: 8),
+          Text(
+            '显示最近7天的每日账单总金额趋势',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
             ),
           ),
         ],

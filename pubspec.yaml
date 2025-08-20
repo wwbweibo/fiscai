@@ -80,6 +80,9 @@ dependencies:
   # For OCR
   flutter_tesseract_ocr: ^0.4.2
 
+  # For charts
+  fl_chart: ^0.66.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
