@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/bill_provider.dart';
 import '../models/bill.dart';
@@ -16,12 +15,20 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
   late Animation<double> _fadeAnimation;
   String _searchQuery = '';
   String _selectedCategory = '全部';
+  late int _selectedYear;
+  late int _selectedMonth;
   
   final List<String> _categories = ['全部', ...Bill.categories];
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize with current month
+    final now = DateTime.now();
+    _selectedYear = now.year;
+    _selectedMonth = now.month;
+    
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -48,7 +55,8 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
       final matchesSearch = bill.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                            bill.description.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesCategory = _selectedCategory == '全部' || bill.category == _selectedCategory;
-      return matchesSearch && matchesCategory;
+      final matchesMonth = bill.date.year == _selectedYear && bill.date.month == _selectedMonth;
+      return matchesSearch && matchesCategory && matchesMonth;
     }).toList();
   }
 
@@ -160,6 +168,9 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
               children: [
                 // Statistics card
                 _buildStatisticsCard(filteredBills),
+                
+                // Month selector
+                _buildMonthSelector(),
                 
                 // Category filter
                 _buildCategoryFilter(),
@@ -352,6 +363,226 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMonthSelector() {
+    final months = [
+      '1月', '2月', '3月', '4月', '5月', '6月',
+      '7月', '8月', '9月', '10月', '11月', '12月'
+    ];
+    
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF64748B).withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Previous month button
+          IconButton(
+            onPressed: () {
+              setState(() {
+                if (_selectedMonth == 1) {
+                  _selectedMonth = 12;
+                  _selectedYear--;
+                } else {
+                  _selectedMonth--;
+                }
+              });
+            },
+            icon: Icon(Icons.chevron_left, color: Color(0xFF2563EB)),
+          ),
+          
+          // Year month display
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showMonthYearPicker(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  '${_selectedYear}年${months[_selectedMonth - 1]}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Next month button
+          IconButton(
+            onPressed: () {
+              setState(() {
+                if (_selectedMonth == 12) {
+                  _selectedMonth = 1;
+                  _selectedYear++;
+                } else {
+                  _selectedMonth++;
+                }
+              });
+            },
+            icon: Icon(Icons.chevron_right, color: Color(0xFF2563EB)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMonthYearPicker() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        int tempYear = _selectedYear;
+        int tempMonth = _selectedMonth;
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                '选择年月',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              content: Container(
+                width: 300,
+                height: 200,
+                child: Row(
+                  children: [
+                    // Year picker
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '年份',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: ListWheelScrollView.useDelegate(
+                              itemExtent: 40,
+                              controller: FixedExtentScrollController(
+                                initialItem: tempYear - 2020,
+                              ),
+                              onSelectedItemChanged: (index) {
+                                setState(() {
+                                  tempYear = 2020 + index;
+                                });
+                              },
+                              childDelegate: ListWheelChildBuilderDelegate(
+                                builder: (context, index) {
+                                  final year = 2020 + index;
+                                  return Center(
+                                    child: Text(
+                                      '$year年',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: year == tempYear ? Color(0xFF2563EB) : Color(0xFF64748B),
+                                        fontWeight: year == tempYear ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                childCount: 20, // 2020-2039
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Month picker
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '月份',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: ListWheelScrollView.useDelegate(
+                              itemExtent: 40,
+                              controller: FixedExtentScrollController(
+                                initialItem: tempMonth - 1,
+                              ),
+                              onSelectedItemChanged: (index) {
+                                setState(() {
+                                  tempMonth = index + 1;
+                                });
+                              },
+                              childDelegate: ListWheelChildBuilderDelegate(
+                                builder: (context, index) {
+                                  final month = index + 1;
+                                  return Center(
+                                    child: Text(
+                                      '$month月',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: month == tempMonth ? Color(0xFF2563EB) : Color(0xFF64748B),
+                                        fontWeight: month == tempMonth ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                childCount: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    '取消',
+                    style: TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    this.setState(() {
+                      _selectedYear = tempYear;
+                      _selectedMonth = tempMonth;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -560,65 +791,836 @@ class _BillListScreenState extends State<BillListScreen> with TickerProviderStat
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.65,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: Offset(0, -4),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle bar
             Container(
-              width: 40,
+              margin: EdgeInsets.only(top: 8, bottom: 4),
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
                 color: Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              bill.title,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+            
+            // Header with close button
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 12, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '账单详情',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.close,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Color(0xFFF8FAFC),
+                      shape: CircleBorder(),
+                      minimumSize: Size(32, 32),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              bill.description,
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF64748B),
+            
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Compact title and amount section
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: bill.isIncome 
+                            ? [Color(0xFF059669), Color(0xFF10B981)]
+                            : [Color(0xFFDC2626), Color(0xFFEF4444)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (bill.isIncome ? Color(0xFF059669) : Color(0xFFDC2626)).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _getCategoryIcon(bill.category),
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  bill.title,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  bill.category,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '¥${bill.amount.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                bill.isIncome ? '收入' : '支出',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Compact details section
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildCompactDetailRow(
+                            Icons.access_time,
+                            '时间',
+                            '${bill.date.year}-${bill.date.month.toString().padLeft(2, '0')}-${bill.date.day.toString().padLeft(2, '0')} ${bill.date.hour.toString().padLeft(2, '0')}:${bill.date.minute.toString().padLeft(2, '0')}',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCompactDetailRow(
+                            Icons.payment,
+                            '支付方式',
+                            bill.paymentMethod,
+                          ),
+                          if (bill.description.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildCompactDetailRow(
+                              Icons.notes,
+                              '备注',
+                              bill.description,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('关闭'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: bill.title));
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('已复制账单标题')),
-                    );
-                  },
-                  child: Text('复制'),
-                ),
-              ],
+            
+            // Compact action buttons
+            Container(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => _deleteBill(bill),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Color(0xFFDC2626).withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: Color(0xFFDC2626).withOpacity(0.2),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFDC2626),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '删除',
+                            style: TextStyle(
+                              color: Color(0xFFDC2626),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _editBillModal(bill),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Color(0xFF2563EB),
+                        elevation: 2,
+                        shadowColor: Color(0xFF2563EB).withOpacity(0.3),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '编辑',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildCompactDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: Color(0xFF64748B),
+          size: 16,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _editBillModal(Bill bill) async {
+    Navigator.pop(context); // Close the details modal first
+    
+    // Show edit modal
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      enableDrag: false, // 防止意外关闭并稳定键盘
+      builder: (context) => _EditBillModal(bill: bill),
+    );
+    
+    if (result == true) {
+      // Bill was updated successfully
+      // The provider will automatically notify listeners and update the UI
+    }
+  }
+
+  Future<void> _deleteBill(Bill bill) async {
+    Navigator.pop(context); // Close the details modal first
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          '确认删除',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        content: Text(
+          '确定要删除账单"${bill.title}"吗？此操作无法撤销。',
+          style: TextStyle(
+            fontSize: 16,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              '取消',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              '删除',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && bill.id != null) {
+      try {
+        await context.read<BillProvider>().deleteBill(bill.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('账单已删除'),
+              backgroundColor: Color(0xFF059669),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('删除失败：$e'),
+              backgroundColor: Color(0xFFDC2626),
+            ),
+          );
+        }
+      }
+    }
+  }
+}
+
+class _EditBillModal extends StatefulWidget {
+  final Bill bill;
+
+  const _EditBillModal({required this.bill});
+
+  @override
+  _EditBillModalState createState() => _EditBillModalState();
+}
+
+class _EditBillModalState extends State<_EditBillModal> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _titleController;
+  late TextEditingController _amountController;
+  late TextEditingController _descriptionController;
+  late String _selectedCategory;
+  late String _selectedPaymentMethod;
+  late bool _isIncome;
+  late DateTime _selectedDate;
+  bool _isLoading = false;
+
+  final List<String> _paymentMethods = Bill.paymentMethods;
+
+  @override
+  void initState() {
+    super.initState();
+    // 在 initState 中初始化控制器，确保它们不会被重新创建
+    _titleController = TextEditingController(text: widget.bill.title);
+    _amountController = TextEditingController(text: widget.bill.amount.toString());
+    _descriptionController = TextEditingController(text: widget.bill.description);
+    _selectedCategory = widget.bill.category;
+    _selectedPaymentMethod = widget.bill.paymentMethod;
+    _isIncome = widget.bill.isIncome;
+    _selectedDate = widget.bill.date;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: EdgeInsets.only(top: 8, bottom: 4),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Header
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 12, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '编辑账单',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Color(0xFFF8FAFC),
+                        shape: CircleBorder(),
+                        minimumSize: Size(32, 32),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Income/Expense toggle
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _isIncome = false),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: !_isIncome ? Color(0xFFDC2626) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '支出',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: !_isIncome ? Colors.white : Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _isIncome = true),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: _isIncome ? Color(0xFF059669) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '收入',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: _isIncome ? Colors.white : Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Title field
+                        TextFormField(
+                          controller: _titleController,
+                          decoration: InputDecoration(
+                            labelText: '账单标题',
+                            labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFF2563EB)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          validator: (value) => value?.isEmpty == true ? '请输入账单标题' : null,
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Amount field
+                        TextFormField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: '金额',
+                            labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFF2563EB)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            prefixText: '¥ ',
+                          ),
+                          validator: (value) {
+                            if (value?.isEmpty == true) return '请输入金额';
+                            if (double.tryParse(value!) == null) return '请输入有效金额';
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Category and Payment method row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedCategory,
+                                decoration: InputDecoration(
+                                  labelText: '分类',
+                                  labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Color(0xFF2563EB)),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                items: Bill.categories.map((category) {
+                                  return DropdownMenuItem(
+                                    value: category,
+                                    child: Text(category, style: TextStyle(fontSize: 14)),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() => _selectedCategory = value!),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedPaymentMethod,
+                                decoration: InputDecoration(
+                                  labelText: '支付方式',
+                                  labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Color(0xFF2563EB)),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                items: _paymentMethods.map((method) {
+                                  return DropdownMenuItem(
+                                    value: method,
+                                    child: Text(method, style: TextStyle(fontSize: 14)),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Date field
+                        GestureDetector(
+                          onTap: () async {
+                            final DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(Duration(days: 365)),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null && picked != _selectedDate) {
+                              setState(() => _selectedDate = picked);
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today, size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+                                  style: TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Description field
+                        TextFormField(
+                          controller: _descriptionController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            labelText: '备注（可选）',
+                            labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Color(0xFF2563EB)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Save button
+              Container(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : () async {
+                      if (!_formKey.currentState!.validate()) return;
+
+                      setState(() => _isLoading = true);
+
+                      try {
+                        final updatedBill = widget.bill.copyWith(
+                          title: _titleController.text.trim(),
+                          amount: double.parse(_amountController.text),
+                          description: _descriptionController.text.trim(),
+                          category: _selectedCategory,
+                          paymentMethod: _selectedPaymentMethod,
+                          isIncome: _isIncome,
+                          date: _selectedDate,
+                        );
+
+                        await context.read<BillProvider>().updateBill(updatedBill);
+
+                        if (context.mounted) {
+                          Navigator.pop(context, true); // Return true to indicate success
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('账单已更新'),
+                              backgroundColor: Color(0xFF059669),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('更新失败：$e'),
+                              backgroundColor: Color(0xFFDC2626),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setState(() => _isLoading = false);
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: Color(0xFF2563EB),
+                      elevation: 2,
+                      shadowColor: Color(0xFF2563EB).withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            '保存',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
   }
 }
 

@@ -19,7 +19,9 @@ class Bill {
     required this.isIncome,
   });
 
-  static const List<String> categories = ['餐饮', '交通', '购物', '娱乐', '医疗', '教育', '住房', '工资', '奖金', '投资', '理财', '其他'];
+  static const List<String> categories = ['餐饮', '娱乐', '购物','交通', '医疗', '教育', '住房', '工资', '奖金', '投资', '理财', '其他'];
+
+  static const List<String> paymentMethods = ['现金', '信用卡', '借记卡', '支付宝', '微信', '京东支付', '美团支付', '其他'];
 
   Map<String, dynamic> toMap() {
     return {
